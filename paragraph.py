@@ -59,9 +59,14 @@ class Sorter(threading.Thread):
 
     def run(self):
         global top, sorted_top
+        count = 0
         while not self.kill_received:
+            count += 1
             time.sleep(1.0)
             sorted_top = sorted(top.iteritems(), key=operator.itemgetter(1), reverse=True)[:24]
+            if count == 300: # 5 minutes
+                top = {}
+                count = 0
 
 top = {}
 sorted_top = []
