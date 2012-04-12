@@ -11,6 +11,10 @@ import tailer
 import termcolor
 
 
+def title(string):
+    return termcolor.colored("{0:80}".format(string), 'cyan', 'on_magenta', attrs=['bold'])
+
+
 class LoopThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
@@ -61,6 +65,22 @@ class Printer(LoopThread):
             time.sleep(1.0)
 
 
+class Cleaner(LoopThread):
+    def __init__(self):
+        LoopThread.__init__(self)
+        self.collectors = []
+
+    def run(self):
+        count = 0
+        while not self.kill_received:
+            time.sleep(1.0)
+            count += 1
+            if count == 300: # 5 minutes
+                for collector in self.collectors:
+                    collector.clear()
+                count = 0
+
+
 class Collector(LoopThread):
     NAME = "Collector"
 
@@ -85,20 +105,18 @@ class Collector(LoopThread):
         return False
 
     def run(self):
-        count = 0
         while not self.kill_received:
-            count += 1
             self.sorted_top = sorted(self.top.iteritems(), key=operator.itemgetter(1), reverse=True)[:self.limit]
             time.sleep(1.0)
-            if count == 300: # 5 minutes
-                self.top = {}
-                count = 0
 
     def format(self, key, count):
         return str((key, count))
 
+    def clear(self):
+        self.top = {}
+
     def __str__(self):
-        string = termcolor.colored("{0:80}".format(self.NAME), 'cyan', 'on_magenta', attrs=['bold'])
+        string = title(self.NAME)
         string += "\n"
         lines = 0
         for key, count in self.sorted_top:
@@ -130,8 +148,12 @@ class SplitCollector():
         self.first_collector.stop()
         self.second_collector.stop()
 
+    def clear(self):
+        self.first_collector.clear()
+        self.second_collector.clear()
+
     def __str__(self):
-        string = termcolor.colored("{0:45}{1:35}".format(self.first_collector.NAME, self.second_collector.NAME), 'cyan', 'on_magenta', attrs=['bold'])
+        string = title("{0:45}{1:35}".format(self.first_collector.NAME, self.second_collector.NAME))
         string += "\n"
         for i in range(self.limit):
             if self.first_collector.sorted_top:
@@ -191,8 +213,52 @@ class TopStatuses(Collector):
         return "{0:20}{1:15}".format(str(key), count)
 
 
+class FakeCollector():
+    NAME = "FAKE COLLECTOR"
+
+    def add(self, line):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def clear(self):
+        pass
+
+    def __str__(self):
+        return ""
+
+class LastConnectionNumber(FakeCollector):
+    NAME = "LAST CONNECTION NUMBER"
+
+    def add(self, line):
+        self.NAME = "{0:25}{1:10}".format("LAST CONNECTION NUMBER", line['connection'])
+
+
+class MegabytesSent(FakeCollector):
+    NAME = "MEGABYTES SENT"
+
+    def __init__(self):
+        self.sent = 0
+
+    def add(self, line):
+        self.sent += line['bytes_sent']
+        self.NAME = "{0:25}{1:10}".format("MEGABYTES SENT", self.sent / 1024 / 1024)
+
+    def clear(self):
+        self.sent = 0
+
+
 def main():
-    collectors = [TopQueriesByIPAddress(8), TopQueries(8), SplitCollector(TopIPAddresses(), TopStatuses(), 4)]
+    collectors = [
+        TopQueriesByIPAddress(7),
+        TopQueries(7),
+        SplitCollector(TopIPAddresses(), TopStatuses(), 5),
+        SplitCollector(LastConnectionNumber(), MegabytesSent(), 0)
+    ]
 
     reader = Reader()
     reader.collectors = collectors
@@ -205,12 +271,17 @@ def main():
     printer.collectors = collectors
     printer.start()
 
+    cleaner = Cleaner()
+    cleaner.collectors = collectors
+    cleaner.start()
+
     while True:
         try:
-            time.sleep(0.01)
+            time.sleep(0.1)
         except:
-            reader.stop()
             printer.stop()
+            reader.stop()
+            cleaner.stop()
             for collector in collectors:
                 collector.stop()
             break
