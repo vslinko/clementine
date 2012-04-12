@@ -158,7 +158,7 @@ class TopQueriesByIPAddress(Collector):
         return (line['remote_addr'], line['url'])
 
     def format(self, key, count):
-        return "{0:16}{1:59}{2:5}".format(key[0], key[1][:59], count)
+        return "{0:16}{1:58}{2:6}".format(key[0], key[1][:58], count)
 
 
 class TopQueries(Collector):
@@ -168,7 +168,7 @@ class TopQueries(Collector):
         return line['url']
 
     def format(self, key, count):
-        return "{0:75}{1:5}".format(key[:75], count)
+        return "{0:74}{1:6}".format(key[:74], count)
 
 
 class TopIPAddresses(Collector):
@@ -178,7 +178,7 @@ class TopIPAddresses(Collector):
         return line['remote_addr']
 
     def format(self, key, count):
-        return "{0:25}{1:10}".format(key[:75], count)
+        return "{0:25}{1:10}".format(key, count)
 
 
 class TopStatuses(Collector):
