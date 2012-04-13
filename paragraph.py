@@ -215,6 +215,9 @@ class TopQueriesByIPAddress(Collector):
         if line['remote_addr'] == "83.229.185.11":
             return False
 
+        if line['url'] == "http://agency.pegast.ru/block.php":
+            return False
+
         return (line['remote_addr'], line['url'])
 
     def format(self, key, count):
@@ -226,6 +229,9 @@ class TopQueries(Collector):
 
     def make_key(self, line):
         if line['url'] == "http://pegast.ru-":
+            return False
+
+        if line['url'] == "http://agency.pegast.ru/block.php":
             return False
 
         return line['url']
