@@ -7,6 +7,8 @@ import re
 import operator
 import os
 import sys
+import BaseHTTPServer
+import json
 import tailer
 import termcolor
 
@@ -81,6 +83,39 @@ class Cleaner(LoopThread):
                 count = 0
 
 
+class Server(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.collectors = []
+        self.httpd = BaseHTTPServer.HTTPServer(('', 8080), ServerHandler)
+        self.httpd.timeout = 1.0
+
+    def run(self):
+        self.httpd.collectors = self.collectors
+        self.httpd.serve_forever()
+
+    def stop(self):
+        self.httpd.shutdown()
+
+
+class ServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        res = []
+        for collector in self.server.collectors:
+            if isinstance(collector, SplitCollector):
+                res.append(collector.first_collector.dump())
+                res.append(collector.second_collector.dump())
+            else:
+                res.append(collector.dump())
+        self.wfile.write(json.dumps(res))
+
+    def log_message(self, format, *args):
+        pass
+
+
 class Collector(LoopThread):
     NAME = "Collector"
 
@@ -114,6 +149,9 @@ class Collector(LoopThread):
 
     def clear(self):
         self.top = {}
+
+    def dump(self):
+        return {"name": self.NAME, "data": self.sorted_top}
 
     def __str__(self):
         string = title(self.NAME)
@@ -187,6 +225,9 @@ class TopQueries(Collector):
     NAME = "TOP QUERIES"
 
     def make_key(self, line):
+        if line['url'] == "http://pegast.ru-":
+            return False
+
         return line['url']
 
     def format(self, key, count):
@@ -228,14 +269,24 @@ class FakeCollector():
     def clear(self):
         pass
 
+    def dump(self):
+        pass
+
     def __str__(self):
         return ""
 
 class LastConnectionNumber(FakeCollector):
     NAME = "LAST CONNECTION NUMBER"
 
+    def __init__(self):
+        self.last = 0
+
     def add(self, line):
-        self.NAME = "{0:25}{1:10}".format("LAST CONNECTION NUMBER", line['connection'])
+        self.last = line['connection']
+        self.NAME = "{0:25}{1:10}".format("LAST CONNECTION NUMBER", self.last)
+
+    def dump(self):
+        return {"name": "LAST CONNECTION NUMBER", "data": self.last}
 
 
 class MegabytesSent(FakeCollector):
@@ -247,6 +298,9 @@ class MegabytesSent(FakeCollector):
     def add(self, line):
         self.sent += line['bytes_sent']
         self.NAME = "{0:25}{1:10}".format("MEGABYTES SENT", self.sent / 1024 / 1024)
+
+    def dump(self):
+        return {"name": "BYTES SENT", "data": self.sent}
 
     def clear(self):
         self.sent = 0
@@ -275,10 +329,15 @@ def main():
     cleaner.collectors = collectors
     cleaner.start()
 
+    server = Server()
+    server.collectors = collectors
+    server.start()
+
     while True:
         try:
             time.sleep(0.1)
         except:
+            server.stop()
             printer.stop()
             reader.stop()
             cleaner.stop()
