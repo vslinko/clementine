@@ -33,24 +33,35 @@ class Reader(LoopThread):
         self.collectors = []
 
     def run(self):
-        for line in csv.reader(tailer.follow(open("/var/log/nginx/paragraph.log")), delimiter=' '):
+        for line in csv.reader(tailer.follow(open("/var/log/nginx/access.log")), delimiter=' '):
             if self.kill_received:
                 break
 
+            parsed_line = self.parse(line)
+
+            if not parsed_line or parsed_line["request_uri"] == "-" or parsed_line["url"] == "http://agency.pegast.ru/block.php":
+                continue
+
             for collector in self.collectors:
-                collector.add(self.parse(line))
+                collector.add(parsed_line)
 
     def parse(self, line):
+        if len(line) != 11:
+            return False
+
         return {
             "connection": int(line[0]),
             "msec": float(line[1]),
             "request_time": float(line[2]),
             "remote_addr": line[3],
             "request_method": line[4],
-            "url": self.url_re.sub("{x}", line[5]),
-            "status": int(line[6]),
-            "request_length": int(line[7]) if line[7] != '-' else None,
-            "bytes_sent": int(line[8])
+            "scheme": line[5],
+            "host": line[6],
+            "request_uri": line[7],
+            "status": int(line[8]),
+            "request_length": int(line[9]) if line[9] != '-' else None,
+            "bytes_sent": int(line[10]),
+            "url": self.url_re.sub("{x}", "{0}://{1}{2}".format(line[5], line[6], line[7]))
         }
 
 
@@ -91,7 +102,7 @@ class Server(threading.Thread):
         self.httpd.timeout = 1.0
 
     def run(self):
-        self.httpd.collectors = self.collectors
+        self.httpd.thread = self
         self.httpd.serve_forever()
 
     def stop(self):
@@ -104,13 +115,13 @@ class ServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
         res = []
-        for collector in self.server.collectors:
+        for collector in self.server.thread.collectors:
             if isinstance(collector, SplitCollector):
                 res.append(collector.first_collector.dump())
                 res.append(collector.second_collector.dump())
             else:
                 res.append(collector.dump())
-        self.wfile.write(json.dumps(res))
+        self.wfile.write(json.dumps(res, indent=4))
 
     def log_message(self, format, *args):
         pass
@@ -139,9 +150,12 @@ class Collector(LoopThread):
     def make_key(self, line):
         return False
 
+    def sort(self):
+        self.sorted_top = sorted(self.top.iteritems(), key=operator.itemgetter(1), reverse=True)[:self.limit]
+
     def run(self):
         while not self.kill_received:
-            self.sorted_top = sorted(self.top.iteritems(), key=operator.itemgetter(1), reverse=True)[:self.limit]
+            self.sort()
             time.sleep(1.0)
 
     def format(self, key, count):
@@ -212,10 +226,7 @@ class TopQueriesByIPAddress(Collector):
     NAME = "TOP QUERIES BY IP ADDRESS"
 
     def make_key(self, line):
-        if line['remote_addr'] == "83.229.185.11":
-            return False
-
-        if line['url'] == "http://agency.pegast.ru/block.php":
+        if line["remote_addr"] == "83.229.185.11" or line["remote_addr"] == "83.229.211.229":
             return False
 
         return (line['remote_addr'], line['url'])
@@ -224,16 +235,24 @@ class TopQueriesByIPAddress(Collector):
         return "{0:16}{1:58}{2:6}".format(key[0], key[1][:58], count)
 
 
+class SuspiciousIP(TopQueriesByIPAddress):
+    NAME = "SUSPICIOUS IP"
+
+    def sort(self):
+        suspicious = [x for x in self.top.iteritems() if "samo" in x[0][1] and "andromeda" not in x[0][1] and x[1] > 10]
+        self.sorted_top = sorted(suspicious, key=operator.itemgetter(1), reverse=True)[:self.limit]
+
+    def format(self, key, count):
+        string = TopQueriesByIPAddress.format(self, key, count)
+        if count > 100:
+            string = termcolor.colored(string, 'red')
+        return string
+
+
 class TopQueries(Collector):
     NAME = "TOP QUERIES"
 
     def make_key(self, line):
-        if line['url'] == "http://pegast.ru-":
-            return False
-
-        if line['url'] == "http://agency.pegast.ru/block.php":
-            return False
-
         return line['url']
 
     def format(self, key, count):
@@ -242,6 +261,10 @@ class TopQueries(Collector):
 
 class TopIPAddresses(Collector):
     NAME = "TOP IP ADDRESSES"
+
+    def dump(self):
+        self.sort() # why?!
+        return Collector.dump(self)
 
     def make_key(self, line):
         return line['remote_addr']
@@ -252,6 +275,10 @@ class TopIPAddresses(Collector):
 
 class TopStatuses(Collector):
     NAME = "TOP STATUSES"
+
+    def dump(self):
+        self.sort() # why?!
+        return Collector.dump(self)
 
     def make_key(self, line):
         return line['status']
@@ -280,6 +307,7 @@ class FakeCollector():
 
     def __str__(self):
         return ""
+
 
 class LastConnectionNumber(FakeCollector):
     NAME = "LAST CONNECTION NUMBER"
@@ -315,7 +343,8 @@ class MegabytesSent(FakeCollector):
 def main():
     collectors = [
         TopQueriesByIPAddress(7),
-        TopQueries(7),
+        #TopQueries(7),
+        SuspiciousIP(7),
         SplitCollector(TopIPAddresses(), TopStatuses(), 5),
         SplitCollector(LastConnectionNumber(), MegabytesSent(), 0)
     ]
