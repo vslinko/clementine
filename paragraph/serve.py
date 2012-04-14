@@ -25,7 +25,6 @@ def serve(report_classes=None, parser_class=paragraph.parser.Parser):
 
     for report in screen.reports:
         report.start()
-        time.sleep(0.1)
 
     server = paragraph.server.Server(screen.reports)
     server.start()

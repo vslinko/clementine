@@ -12,27 +12,27 @@ class Report(LoopThread):
     REFRESH_TIME = 1.0
     MIN_COLS = 1
 
-    def __init__(self, lines, cols, window):
+    def __init__(self):
         LoopThread.__init__(self)
-
-        self.lines = lines
-        self.cols = cols
-        self.window = window
+        self.setup()
 
     def run(self):
         while self.launched():
             time.sleep(self.REFRESH_TIME)
 
             if self.cols < self.MIN_COLS:
+                self.window.clear()
                 continue
 
             self.refresh()
 
-    def update_window(self, lines, cols, y):
+    def update_window(self, lines, cols, window):
         self.lines = lines
         self.cols = cols
-        self.window.resize(lines, cols)
-        self.window.mvwin(y, 0)
+        self.window = window
+
+    def setup(self):
+        pass
 
     def add(self, record):
         pass
@@ -47,13 +47,8 @@ class Report(LoopThread):
 class TopReport(Report):
     MAX_SIZE = 10000
 
-    def __init__(self, lines, cols, window):
-        Report.__init__(self, lines, cols, window)
-
+    def setup(self):
         self.top = {}
-
-        self.update_title()
-        self.window.refresh()
 
     def add(self, record):
         key = self.make_key(record)
@@ -67,15 +62,13 @@ class TopReport(Report):
         sorted_top = self.sort()[:self.lines - 1]
 
         self.window.clear()
-        self.update_title()
+        self.window.insstr(("{0:" + str(self.cols) + "}").format(self.NAME), curses.color_pair(1))
 
         line = 1
         for key, count in sorted_top:
             self.window.move(line, 0)
             self.window.insstr(self.format(key, count))
             line += 1
-
-        self.window.refresh()
 
         if len(self.top) > self.MAX_SIZE:
             self.top = {}
@@ -85,15 +78,6 @@ class TopReport(Report):
 
     def dump(self):
         return self.sort()[:10]
-
-    def update_window(self, lines, cols, y):
-        Report.update_window(self, lines, cols, y)
-
-        self.update_title()
-        self.window.refresh()
-
-    def update_title(self):
-        self.window.insstr(("{0:" + str(self.cols) + "}").format(self.NAME), curses.color_pair(1))
 
     def make_key(self, record):
         pass
@@ -163,30 +147,26 @@ class TopStatusesReport(TopReport):
 
 
 class OneLineReport(Report):
-    def __init__(self, lines, cols, window):
-        Report.__init__(self, lines, cols, window)
-        self.refresh()
-
     def refresh(self):
         name_col = len(self.NAME) + 1
         count_col = self.cols - name_col
 
         dump = self.dump()
 
+        self.window.clear()
+
         if len(str(dump)) > count_col or name_col + count_col > self.cols:
             return
 
-        self.window.clear()
-        self.window.insstr(("{0:" + str(name_col) + "}{1:" + str(count_col) + "}").format(self.NAME, dump), curses.color_pair(1))
-        self.window.refresh()
+        self.window.insstr(("{0:" + str(name_col) + "}{1:" + str(count_col) + "}").format(self.NAME, dump),
+            curses.color_pair(1))
 
 
 class LastConnectionNumberReport(OneLineReport):
     NAME = "LAST CONNECTION NUMBER"
 
-    def __init__(self, lines, cols, window):
+    def setup(self):
         self.last = 0
-        OneLineReport.__init__(self, lines, cols, window)
 
     def add(self, record):
         self.last = record["connection"]
@@ -198,9 +178,8 @@ class LastConnectionNumberReport(OneLineReport):
 class MegabytesSentReport(OneLineReport):
     NAME = "MEGABYTES SENT"
 
-    def __init__(self, lines, cols, window):
+    def setup(self):
         self.sent = 0
-        OneLineReport.__init__(self, lines, cols, window)
 
     def add(self, record):
         self.sent += record["bytes_sent"]

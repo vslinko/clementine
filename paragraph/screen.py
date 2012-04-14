@@ -11,7 +11,7 @@ class Screen(LoopThread):
     def __init__(self, report_classes):
         LoopThread.__init__(self)
 
-        self.reports = []
+        self.reports = [report_class() for report_class in report_classes]
         self.screen = curses.initscr()
 
         curses.curs_set(0)
@@ -19,7 +19,7 @@ class Screen(LoopThread):
         curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_MAGENTA)
 
         self.lines, self.cols = self.screen.getmaxyx()
-        self.init_screen(report_classes)
+        self.update_screen()
 
     def __del__(self):
         curses.endwin()
@@ -35,28 +35,19 @@ class Screen(LoopThread):
                 self.cols = cols
                 self.update_screen()
 
-    def init_screen(self, report_classes):
-        self._calculate_size(report_classes, self._init_report)
+            for report in self.reports:
+                report.window.refresh()
 
     def update_screen(self):
-        self._calculate_size(self.reports, self._update_report)
-
-    def _init_report(self, report_class, lines, cols, line):
-        window = self.screen.subwin(lines, cols, line, 0)
-        self.reports.append(report_class(lines, cols, window))
-
-    def _update_report(self, report, lines, cols, line):
-        report.update_window(lines, cols, line)
-
-    def _calculate_size(self, items, fun):
-        lines = int(math.floor(self.lines / len(items)))
+        lines = int(math.floor(self.lines / len(self.reports)))
         line = 0
-        for item in items:
+        for report in self.reports:
             total_lines = lines
 
             if line == 0:
-                total_lines += self.lines - (lines * len(items))
+                total_lines += self.lines - (lines * len(self.reports))
 
-            fun(item, total_lines, self.cols, line)
+            window = self.screen.subwin(total_lines, self.cols, line, 0)
+            report.update_window(total_lines, self.cols, window)
 
             line += total_lines
