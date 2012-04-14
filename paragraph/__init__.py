@@ -1,1 +1,1 @@
-from paragraph.loop import serve
+from paragraph.serve import serve
