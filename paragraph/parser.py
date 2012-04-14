@@ -10,10 +10,10 @@ __all__ = ["Parser", "FakeParser"]
 
 
 class Parser(LoopThread):
-    def __init__(self, reports, file):
+    def __init__(self, file):
         LoopThread.__init__(self)
 
-        self.reports = reports
+        self.reports = []
         self.file = file
         self.url_re = re.compile(r"\d+")
 
@@ -27,8 +27,9 @@ class Parser(LoopThread):
             if not record or record["request_uri"] == "-" or record["url"] == "http://agency.pegast.ru/block.php":
                 continue
 
-            for report in self.reports:
-                report.add(record)
+            for inline_reports in self.reports:
+                for report in inline_reports:
+                    report.add(record)
 
     def parse(self, line):
         if len(line) != 11:
@@ -57,8 +58,8 @@ class FakeParser(Parser):
     URIS = ["/" + "".join([choice("qwertyuiopasdfghjklzxcvbnm") for x in range(0, randint(1, 100))])
             for i in range(50)]
 
-    def __init__(self, reports, file):
-        Parser.__init__(self, reports, file)
+    def __init__(self, file=None):
+        Parser.__init__(self, file)
 
         self.connection = randint(10000, 100000)
 
@@ -66,8 +67,9 @@ class FakeParser(Parser):
         while not self.kill_received:
             time.sleep(0.01)
 
-            for report in self.reports:
-                report.add(self.random_record())
+            for inline_reports in self.reports:
+                for report in inline_reports:
+                    report.add(self.random_record())
 
     def random_record(self):
         self.connection += 1

@@ -5,26 +5,27 @@ from paragraph.server import *
 from paragraph.reports import *
 
 
-def serve(file="/var/log/nginx/access.log", parser_class=Parser, report_classes=None):
-    if not report_classes:
-        report_classes = [
-            TopQueriesByIPAddressReport,
-            SuspiciousIPReport,
-            TopQueriesReport,
-            TopIPAddressesReport,
-            TopStatusesReport,
-            LastConnectionNumberReport,
-            MegabytesSentReport
+def serve(file_path="/var/log/nginx/access.log", parser=None, reports=None):
+    if not reports:
+        reports = [
+            [TopQueriesByIPAddressReport()],
+            [SuspiciousIPReport()],
+            [TopQueriesReport()],
+            [TopIPAddressesReport(), TopStatusesReport()],
+            [LastConnectionNumberReport(), MegabytesSentReport()]
         ]
 
-    screen = Screen(report_classes)
+    screen = Screen(reports)
     screen.start()
 
-    parser = parser_class(screen.reports, file)
+    if not parser:
+        parser = Parser(file_path)
+    parser.reports = reports
     parser.start()
 
-    for report in screen.reports:
-        report.start()
+    for inline_reports in screen.reports:
+        for report in inline_reports:
+            report.start()
 
     server = Server(screen.reports)
     server.start()
@@ -37,7 +38,8 @@ def serve(file="/var/log/nginx/access.log", parser_class=Parser, report_classes=
             screen.stop()
             parser.stop()
 
-            for report in screen.reports:
-                report.stop()
+            for inline_reports in screen.reports:
+                for report in inline_reports:
+                    report.stop()
 
             break

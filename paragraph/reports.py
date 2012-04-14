@@ -14,6 +14,9 @@ class Report(LoopThread):
 
     def __init__(self):
         LoopThread.__init__(self)
+        self.lines = 0
+        self.cols = 0
+        self.window = None
         self.setup()
 
     def run(self):
@@ -27,6 +30,10 @@ class Report(LoopThread):
             self.refresh()
 
     def update_window(self, lines, cols, window):
+        if self.window:
+            self.window.clear()
+            self.window.refresh()
+
         self.lines = lines
         self.cols = cols
         self.window = window
@@ -46,6 +53,11 @@ class Report(LoopThread):
 
 class TopReport(Report):
     MAX_SIZE = 10000
+
+    def __init__(self):
+        Report.__init__(self)
+        self.format_string = ""
+        self.string_size = 0
 
     def setup(self):
         self.top = {}
@@ -79,10 +91,17 @@ class TopReport(Report):
     def dump(self):
         return self.sort()[:10]
 
+    def update_window(self, lines, cols, window):
+        Report.update_window(self, lines, cols, window)
+        self.update_format()
+
     def make_key(self, record):
         pass
 
     def format(self, key, count):
+        pass
+
+    def update_format(self):
         pass
 
 
@@ -96,10 +115,12 @@ class TopQueriesByIPAddressReport(TopReport):
     def format(self, key, count):
         ip, url = key
 
-        url_field_size = self.cols - 16 - 6
-        url = url[:url_field_size - 1]
+        return self.format_string.format(ip, url[:self.string_size], count)
 
-        return ("{0:16}{1:" + str(url_field_size) + "}{2:6}").format(ip, url, count)
+    def update_format(self):
+        url_field_size = self.cols - 16 - 6
+        self.format_string = "{0:16}{1:" + str(url_field_size) + "}{2:6}"
+        self.string_size = url_field_size - 1
 
 
 class SuspiciousIPReport(TopQueriesByIPAddressReport):
@@ -118,10 +139,12 @@ class TopQueriesReport(TopReport):
         return record["url"]
 
     def format(self, url, count):
-        url_field_size = self.cols - 6
-        url = url[:url_field_size - 1]
+        return self.format_string.format(url[:self.string_size], count)
 
-        return ("{0:" + str(url_field_size) + "}{1:6}").format(url, count)
+    def update_format(self):
+        url_field_size = self.cols - 6
+        self.format_string = "{0:" + str(url_field_size) + "}{1:6}"
+        self.string_size = url_field_size - 1
 
 
 class TopIPAddressesReport(TopReport):
@@ -132,7 +155,10 @@ class TopIPAddressesReport(TopReport):
         return record["remote_addr"]
 
     def format(self, key, count):
-        return ("{0:16}{1:" + str(self.cols - 16) + "}").format(key, count)
+        return self.format_string.format(key, count)
+
+    def update_format(self):
+        self.format_string = "{0:16}{1:" + str(self.cols - 16) + "}"
 
 
 class TopStatusesReport(TopReport):
@@ -143,7 +169,10 @@ class TopStatusesReport(TopReport):
         return str(record["status"])
 
     def format(self, key, count):
-        return ("{0:4}{1:" + str(self.cols - 4) + "}").format(key, count)
+        return self.format_string.format(key, count)
+
+    def update_format(self):
+        self.format_string = "{0:4}{1:" + str(self.cols - 4) + "}"
 
 
 class OneLineReport(Report):

@@ -14,14 +14,13 @@ class Server(threading.Thread):
         self.httpd = None
 
     def run(self):
-        if self.httpd:
-            try:
-                self.httpd = BaseHTTPServer.HTTPServer(("", 8080), ServerHandler)
-                self.httpd.timeout = 1.0
-                self.httpd.thread = self
-                self.httpd.serve_forever()
-            except:
-                pass
+        try:
+            self.httpd = BaseHTTPServer.HTTPServer(("", 8080), ServerHandler)
+            self.httpd.timeout = 1.0
+            self.httpd.thread = self
+            self.httpd.serve_forever()
+        except:
+            pass
 
     def stop(self):
         if self.httpd:
@@ -35,8 +34,9 @@ class ServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.end_headers()
 
         res = {}
-        for report in self.server.thread.reports:
-            res[report.NAME] = report.dump()
+        for inline_reports in self.server.thread.reports:
+            for report in inline_reports:
+                res[report.NAME] = report.dump()
 
         self.wfile.write(json.dumps(res, indent=4))
 
