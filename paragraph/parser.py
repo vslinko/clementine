@@ -10,14 +10,15 @@ __all__ = ["Parser", "FakeParser"]
 
 
 class Parser(LoopThread):
-    def __init__(self, reports):
+    def __init__(self, reports, file):
         LoopThread.__init__(self)
 
         self.reports = reports
+        self.file = file
         self.url_re = re.compile(r"\d+")
 
     def run(self):
-        for line in csv.reader(tailer.follow(open("/var/log/nginx/access.log")), delimiter=" "):
+        for line in csv.reader(tailer.follow(open(self.file)), delimiter=' '):
             if self.kill_received:
                 break
 
@@ -56,8 +57,8 @@ class FakeParser(Parser):
     URIS = ["/" + "".join([choice("qwertyuiopasdfghjklzxcvbnm") for x in range(0, randint(1, 100))])
             for i in range(50)]
 
-    def __init__(self, reports):
-        Parser.__init__(self, reports)
+    def __init__(self, reports, file):
+        Parser.__init__(self, reports, file)
 
         self.connection = randint(10000, 100000)
 
