@@ -64,7 +64,9 @@ class Report(LoopThread):
 class TopReport(Report):
     def __init__(self):
         Report.__init__(self)
-        self.reset()
+        self.format_string = ""
+        self.string_size = 0
+        self.top = collections.Counter()
 
     def add(self, record):
         key = self.make_key(record)
@@ -97,9 +99,7 @@ class TopReport(Report):
         self.update_format()
 
     def reset(self):
-        self.format_string = ""
-        self.string_size = 0
-        self.top = collections.Counter()
+        self.top.clear()
 
     def make_key(self, record):
         pass
