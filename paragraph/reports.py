@@ -73,6 +73,9 @@ class TopReport(Report):
     def add(self, record):
         key = self.make_key(record)
 
+        if not key:
+            return
+
         if key in self.top:
             self.top[key] += 1
         else:
@@ -118,6 +121,9 @@ class TopQueriesByIPAddressReport(TopReport):
     MIN_COLS = 32
 
     def make_key(self, record):
+        if record["remote_addr"] == "83.229.185.11":
+            return False
+
         return (record["remote_addr"], record["url"])
 
     def format(self, key, count):
