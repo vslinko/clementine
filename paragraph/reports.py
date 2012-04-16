@@ -11,6 +11,7 @@ class Report(LoopThread):
     NAME = "REPORT"
     REFRESH_TIME = 1.0
     MIN_COLS = 1
+    RESET_COUNT = 300
 
     def __init__(self):
         LoopThread.__init__(self)
@@ -20,6 +21,7 @@ class Report(LoopThread):
         self.setup()
 
     def run(self):
+        count = 0
         while self.launched():
             time.sleep(self.REFRESH_TIME)
 
@@ -28,6 +30,11 @@ class Report(LoopThread):
                 continue
 
             self.refresh()
+
+            count += 1
+            if count == self.RESET_COUNT:
+                self.reset()
+                count = 0
 
     def update_window(self, lines, cols, window):
         if self.window:
@@ -50,10 +57,11 @@ class Report(LoopThread):
     def refresh(self):
         pass
 
+    def reset(self):
+        pass
+
 
 class TopReport(Report):
-    MAX_SIZE = 10000
-
     def __init__(self):
         Report.__init__(self)
         self.format_string = ""
@@ -82,9 +90,6 @@ class TopReport(Report):
             self.window.insstr(self.format(key, count))
             line += 1
 
-        if len(self.top) > self.MAX_SIZE:
-            self.top = {}
-
     def sort(self):
         return sorted(self.top.iteritems(), key=lambda x: x[1], reverse=True)
 
@@ -94,6 +99,9 @@ class TopReport(Report):
     def update_window(self, lines, cols, window):
         Report.update_window(self, lines, cols, window)
         self.update_format()
+
+    def reset(self):
+        self.top = {}
 
     def make_key(self, record):
         pass
@@ -215,3 +223,6 @@ class MegabytesSentReport(OneLineReport):
 
     def dump(self):
         return self.sent / 1024 / 1024
+
+    def reset(self):
+        self.sent = 0
