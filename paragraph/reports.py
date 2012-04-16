@@ -2,6 +2,11 @@ import time
 import curses
 from paragraph.thread import LoopThread
 
+try:
+    from collections import Counter
+except ImportError:
+    from paragraph.counter import Counter
+
 
 __all__ = ["TopQueriesByIPAddressReport", "SuspiciousIPReport", "TopQueriesReport", "TopIPAddressesReport",
            "TopStatusesReport", "LastConnectionNumberReport", "MegabytesSentReport"]
@@ -18,7 +23,6 @@ class Report(LoopThread):
         self.lines = 0
         self.cols = 0
         self.window = None
-        self.setup()
 
     def run(self):
         count = 0
@@ -66,9 +70,7 @@ class TopReport(Report):
         Report.__init__(self)
         self.format_string = ""
         self.string_size = 0
-
-    def setup(self):
-        self.top = {}
+        self.top = Counter()
 
     def add(self, record):
         key = self.make_key(record)
@@ -76,13 +78,10 @@ class TopReport(Report):
         if not key:
             return
 
-        if key in self.top:
-            self.top[key] += 1
-        else:
-            self.top[key] = 1
+        self.top[key] += 1
 
     def refresh(self):
-        sorted_top = self.sort()[:self.lines - 1]
+        sorted_top = self.sort(self.lines - 1)
 
         self.window.clear()
         self.window.insstr(("{0:" + str(self.cols) + "}").format(self.NAME), curses.color_pair(1))
@@ -93,11 +92,11 @@ class TopReport(Report):
             self.window.insstr(self.format(key, count))
             line += 1
 
-    def sort(self):
-        return sorted(self.top.iteritems(), key=lambda x: x[1], reverse=True)
+    def sort(self, length):
+        return self.top.most_common(length)
 
     def dump(self):
-        return self.sort()[:10]
+        return self.sort(10)
 
     def update_window(self, lines, cols, window):
         Report.update_window(self, lines, cols, window)
@@ -140,9 +139,18 @@ class TopQueriesByIPAddressReport(TopReport):
 class SuspiciousIPReport(TopQueriesByIPAddressReport):
     NAME = "SUSPICIOUS IP"
 
-    def sort(self):
-        top = TopQueriesByIPAddressReport.sort(self)
-        return [x for x in top if "samo" in x[0][1] and "andromeda" not in x[0][1] and x[1] > 10]
+    def sort(self, length):
+        result = []
+        count = 0
+        for key, value in self.top:
+            if "samo" in key[1] and "andromeda" not in key[1] and value > 10:
+                result.append((key, value))
+
+                count += 1
+                if count == length:
+                    break
+
+        return result
 
 
 class TopQueriesReport(TopReport):
@@ -208,7 +216,8 @@ class OneLineReport(Report):
 class LastConnectionNumberReport(OneLineReport):
     NAME = "LAST CONNECTION NUMBER"
 
-    def setup(self):
+    def __init__(self):
+        OneLineReport.__init__(self)
         self.last = 0
 
     def add(self, record):
@@ -221,7 +230,8 @@ class LastConnectionNumberReport(OneLineReport):
 class MegabytesSentReport(OneLineReport):
     NAME = "MEGABYTES SENT"
 
-    def setup(self):
+    def __init__(self):
+        OneLineReport.__init__(self)
         self.sent = 0
 
     def add(self, record):
