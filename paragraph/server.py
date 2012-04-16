@@ -38,7 +38,7 @@ class ServerHandler(http.server.BaseHTTPRequestHandler):
             for report in inline_reports:
                 res[report.NAME] = report.dump()
 
-        self.wfile.write(json.dumps(res, indent=4))
+        self.wfile.write(json.dumps(res, indent=4).encode("utf-8"))
 
     def log_message(self, format, *args):
         pass
