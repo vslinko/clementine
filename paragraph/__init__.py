@@ -9,7 +9,7 @@ def serve(file_path="/var/log/nginx/access.log", parser=None, reports=None):
     if not reports:
         reports = [
             [TopQueriesByIPAddressReport()],
-            [SuspiciousIPReport()],
+            [RequestsToSAMOReport()],
             [TopQueriesReport()],
             [TopIPAddressesReport(), TopStatusesReport()],
             [LastConnectionNumberReport(), MegabytesSentReport()]

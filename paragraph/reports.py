@@ -1,14 +1,10 @@
+import collections
 import time
 import curses
 from paragraph.thread import LoopThread
 
-try:
-    from collections import Counter
-except ImportError:
-    from paragraph.counter import Counter
 
-
-__all__ = ["TopQueriesByIPAddressReport", "SuspiciousIPReport", "TopQueriesReport", "TopIPAddressesReport",
+__all__ = ["TopQueriesByIPAddressReport", "RequestsToSAMOReport", "TopQueriesReport", "TopIPAddressesReport",
            "TopStatusesReport", "LastConnectionNumberReport", "MegabytesSentReport"]
 
 
@@ -103,7 +99,7 @@ class TopReport(Report):
     def reset(self):
         self.format_string = ""
         self.string_size = 0
-        self.top = Counter()
+        self.top = collections.Counter()
 
     def make_key(self, record):
         pass
@@ -136,21 +132,14 @@ class TopQueriesByIPAddressReport(TopReport):
         self.string_size = url_field_size - 1
 
 
-class SuspiciousIPReport(TopQueriesByIPAddressReport):
-    NAME = "SUSPICIOUS IP"
+class RequestsToSAMOReport(TopQueriesByIPAddressReport):
+    NAME = "REQUESTS TO SAMO"
 
-    def sort(self, length):
-        result = []
-        count = 0
-        for key, value in self.top:
-            if "samo" in key[1] and "andromeda" not in key[1] and value > 10:
-                result.append((key, value))
+    def make_key(self, record):
+        if "samo" not in record["request_uri"] or "andromeda" in record["request_uri"]:
+            return False
 
-                count += 1
-                if count == length:
-                    break
-
-        return result
+        return TopQueriesByIPAddressReport.make_key(self, record)
 
 
 class TopQueriesReport(TopReport):

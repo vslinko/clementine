@@ -1,5 +1,5 @@
 import threading
-import BaseHTTPServer
+import http.server
 import json
 
 
@@ -15,7 +15,7 @@ class Server(threading.Thread):
 
     def run(self):
         try:
-            self.httpd = BaseHTTPServer.HTTPServer(("", 8080), ServerHandler)
+            self.httpd = http.server.HTTPServer(("", 8080), ServerHandler)
             self.httpd.timeout = 1.0
             self.httpd.thread = self
             self.httpd.serve_forever()
@@ -27,7 +27,7 @@ class Server(threading.Thread):
             self.httpd.shutdown()
 
 
-class ServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class ServerHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "application/json")
