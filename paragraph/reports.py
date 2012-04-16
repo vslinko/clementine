@@ -135,8 +135,8 @@ class SuspiciousIPReport(TopQueriesByIPAddressReport):
     NAME = "SUSPICIOUS IP"
 
     def sort(self):
-        suspicious = [x for x in self.top.iteritems() if "samo" in x[0][1] and "andromeda" not in x[0][1] and x[1] > 10]
-        return sorted(suspicious, key=lambda x: x[1], reverse=True)
+        top = TopQueriesByIPAddressReport.sort(self)
+        return [x for x in top if "samo" in x[0][1] and "andromeda" not in x[0][1] and x[1] > 10]
 
 
 class TopQueriesReport(TopReport):
