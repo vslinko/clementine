@@ -120,7 +120,7 @@ class TopQueriesByIPAddressReport(TopReport):
     MIN_COLS = 32
 
     def make_key(self, record):
-        if record["remote_addr"] == "83.229.185.11":
+        if record["remote_addr"] == "83.229.211.229" or record["remote_addr"] == "83.229.185.11":
             return False
 
         return (record["remote_addr"], record["url"])
