@@ -227,7 +227,7 @@ class MegabytesSentReport(OneLineReport):
         self.sent += record["bytes_sent"]
 
     def dump(self):
-        return self.sent / 1024 / 1024
+        return int(self.sent / 1024 / 1024)
 
     def reset(self):
         self.sent = 0
