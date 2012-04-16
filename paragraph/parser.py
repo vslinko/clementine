@@ -1,7 +1,6 @@
 import re
-import csv
-import tailer
 import time
+import os
 from random import randint, choice, random
 from paragraph.thread import LoopThread
 
@@ -18,18 +17,27 @@ class Parser(LoopThread):
         self.url_re = re.compile(r"\d+")
 
     def run(self):
-        for line in csv.reader(tailer.follow(open(self.file)), delimiter=' '):
-            if self.kill_received:
-                break
+        with open(self.file) as file:
+            file.seek(0, os.SEEK_END)
+            while True:
+                if self.kill_received:
+                    break
 
-            record = self.parse(line)
+                line = file.readline()
+                if line:
+                    line = line.split(' ')
+                else:
+                    time.sleep(1.0)
+                    continue
 
-            if not record or record["request_uri"] == "-" or record["url"] == "http://agency.pegast.ru/block.php":
-                continue
+                record = self.parse(line)
 
-            for inline_reports in self.reports:
-                for report in inline_reports:
-                    report.add(record)
+                if not record or record["request_uri"] == "-" or record["url"] == "http://agency.pegast.ru/block.php":
+                    continue
+
+                for inline_reports in self.reports:
+                    for report in inline_reports:
+                        report.add(record)
 
     def parse(self, line):
         if len(line) != 11:
